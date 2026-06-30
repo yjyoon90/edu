@@ -1,5 +1,5 @@
-// 글자 따라쓰기 - 오프라인 캐시 서비스워커
-const CACHE = 'trace-v4';
+// 글자 따라쓰기 - 서비스워커 (HTML은 네트워크 우선 → 올리면 바로 반영)
+const CACHE = 'trace-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -22,11 +22,28 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
-      return res;
-    }).catch(() => caches.match('./index.html')))
-  );
+  const url = new URL(e.request.url);
+  const isHTML = e.request.mode === 'navigate'
+    || url.pathname.endsWith('/')
+    || url.pathname.endsWith('index.html');
+
+  if (isHTML) {
+    // 네트워크 우선: 온라인이면 항상 최신 화면, 실패하면 캐시
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put('./index.html', copy));
+        return res;
+      }).catch(() => caches.match('./index.html').then(h => h || caches.match('./')))
+    );
+  } else {
+    // 정적 자원(아이콘 등): 캐시 우선
+    e.respondWith(
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      }))
+    );
+  }
 });
