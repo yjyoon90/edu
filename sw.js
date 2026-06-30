@@ -1,5 +1,5 @@
 // 글자 따라쓰기 - 오프라인 캐시 서비스워커
-const CACHE = 'trace-v1';
+const CACHE = 'trace-v4';
 const ASSETS = [
   './',
   './index.html',

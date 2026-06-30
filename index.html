@@ -159,6 +159,19 @@ unicode-range:U+1100-11FF,U+3130-318F,U+A960-A97F,U+AC00-D7A3,U+D7B0-D7FF;}</sty
     </div>
   </div>
 
+  <div class="modal" id="agemodal">
+    <div class="mbox">
+      <h3>아이 나이를 골라주세요</h3>
+      <div style="font-size:14px;color:#8a93ad;margin:-6px 0 10px">추천 탭과 펜·난이도를 맞춰드려요 (언제든 ⚙️에서 변경)</div>
+      <div class="agecol">
+        <button class="btn agebtn" data-tier="play">🧸 놀이 · 만 3~4세<span>도형·그림 따라그리기</span></button>
+        <button class="btn agebtn" data-tier="start">🔤 글자 시작 · 만 5~6세<span>자음·모음·숫자·가나다</span></button>
+        <button class="btn agebtn" data-tier="write">✍️ 쓰기 · 만 7~8세<span>받침·영어·받아쓰기</span></button>
+        <button class="rectoggle" id="ageall" style="margin:4px auto 0">전체 다 보기</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 // ===== 획순 데이터 (0~100 정사각) =====
 const STROKES = {
@@ -329,11 +342,11 @@ const THEMES=[
 
 let mode="consonant", idx=0, color=COLORS[0], stars=0, drew=false, showOrder=true, playing=false;
 let side=0, ox=0, oy=0, group='ko', penWidth=16, muted=false, examMode=false, themeIdx=0, wmEmoji='', doneItem=false;
-let tier=null, recOnly=false, gradeThr=0.55;
+let tier=null, recOnly=false, strokeThr=0.35, wordThr=0.48, penStrokes=0;
 const TIERS={
-  play:{ pen:24, grade:0.45, mode:'ko_shape', rec:{ ko:['ko_shape','ko_color','ko_animals','ko_food','ko_family','ko_nature'], en:['en_shape','en_color','en_animals','en_food'] } },
-  start:{ pen:18, grade:0.55, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num','en_animals','en_custom'] } },
-  write:{ pen:14, grade:0.60, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num','ko_color','ko_custom'], en:['upper','lower','en_num','en_animals','en_food','en_custom'] } }
+  play:{ pen:24, grade:0.30, mode:'ko_shape', rec:{ ko:['ko_shape','ko_color','ko_animals','ko_food','ko_family','ko_nature'], en:['en_shape','en_color','en_animals','en_food'] } },
+  start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num','en_animals','en_custom'] } },
+  write:{ pen:14, grade:0.42, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num','ko_color','ko_custom'], en:['upper','lower','en_num','en_animals','en_food','en_custom'] } }
 };
 
 const $=id=>document.getElementById(id);
@@ -430,34 +443,26 @@ function drawGuide(){
   const set=SETS[mode];
   if(set.type!=='stroke') drawWordGuide(r); else drawStrokeGuide(r);
   nameEl.textContent = (set.type!=='stroke'||examMode) ? '' : set.items[idx][1];
-  drew=false; doneItem=false; yayEl.classList.remove('show');
+  drew=false; doneItem=false; penStrokes=0; yayEl.classList.remove('show');
   buildMask(); updateControls();
 }
 function drawStrokeGuide(r){
-  const set=SETS[mode];
   if(examMode) return;
-  if(set.useFont){
-    const ch=set.items[idx][0];
-    ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.font=`${side*0.72}px Jua, sans-serif`;
-    ctx.fillStyle='#e9edf7'; ctx.fillText(ch, r.width/2, r.height/2+side*0.03);
-    ctx.lineWidth=2; ctx.strokeStyle='#dbe1ef'; ctx.strokeText(ch, r.width/2, r.height/2+side*0.03);
-    ctx.restore();
-  } else {
-    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#e7ecf6'; ctx.lineWidth=side*0.12;
-    curStrokes().forEach(s=>{ ctx.beginPath(); s.forEach((p,i)=>{const q=M(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);}); ctx.stroke(); });
-  }
+  ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#cdd9f0'; ctx.lineWidth=side*0.13;
+  curStrokes().forEach(s=>{ ctx.beginPath(); s.forEach((p,i)=>{const q=M(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);}); ctx.stroke(); });
   if(showOrder){ curStrokes().forEach((s,i)=>{ arrow(M(s[s.length-2]),M(s[s.length-1])); num(M(s[0]), i+1); }); }
 }
 function drawWordGuide(r){
   const it=SETS[mode].items[idx], word=it[0], emoji=it[2];
+  const base=Math.min(r.width,r.height);
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font=`${side*0.18}px ${EMOJI_FONT}`; ctx.fillText(emoji, r.width/2, oy+side*0.15);
+  ctx.font=`${base*0.30}px ${EMOJI_FONT}`;
+  ctx.fillText(emoji, r.width/2, r.height*0.27);
   if(examMode) return;
-  let fs=side*0.50; const maxW=r.width*0.92; ctx.font=`${fs}px Jua, sans-serif`;
+  let fs=base*0.52; const maxW=r.width*0.90; ctx.font=`${fs}px Jua, sans-serif`;
   while(ctx.measureText(word).width>maxW && fs>10){ fs-=2; ctx.font=`${fs}px Jua, sans-serif`; }
-  ctx.fillStyle='#e7ecf6'; ctx.fillText(word, r.width/2, oy+side*0.60);
-  ctx.lineWidth=2; ctx.strokeStyle='#d7deee'; ctx.strokeText(word, r.width/2, oy+side*0.60);
+  ctx.fillStyle='#cdd9f2'; ctx.fillText(word, r.width/2, r.height*0.66);
+  ctx.lineWidth=3; ctx.strokeStyle='#a9bce8'; ctx.strokeText(word, r.width/2, r.height*0.66);
 }
 function arrow(a,b){ const ang=Math.atan2(b.y-a.y,b.x-a.x), s=side*0.055;
   ctx.fillStyle='#FF6B6B'; ctx.beginPath(); ctx.moveTo(b.x,b.y);
@@ -471,39 +476,45 @@ function num(p,n){ const rad=side*0.052;
 // ===== 채점(자동 칭찬) =====
 function buildMask(){
   const r=cv.getBoundingClientRect();
-  mScale=150/Math.max(r.width,r.height);
+  mScale=280/Math.max(r.width,r.height);
   mW=Math.max(1,Math.round(r.width*mScale)); mH=Math.max(1,Math.round(r.height*mScale));
   og.width=mW; og.height=mH; oi.width=mW; oi.height=mH;
   ogc.clearRect(0,0,mW,mH); oic.clearRect(0,0,mW,mH);
   ogc.fillStyle='#000'; ogc.strokeStyle='#000'; ogc.lineCap='round'; ogc.lineJoin='round';
   const set=SETS[mode];
   if(set.type!=='stroke'){
-    const word=set.items[idx][0]; let fs=side*0.50*mScale; const maxW=mW*0.92;
+    const word=set.items[idx][0]; const base=Math.min(mW,mH);
+    let fs=base*0.52; const maxW=mW*0.90;
     ogc.textAlign='center'; ogc.textBaseline='middle'; ogc.font=`${fs}px Jua, sans-serif`;
     while(ogc.measureText(word).width>maxW && fs>4){ fs-=1; ogc.font=`${fs}px Jua, sans-serif`; }
-    ogc.fillText(word, mW/2, (oy+side*0.60)*mScale);
+    ogc.fillText(word, mW/2, mH*0.66);
   } else {
-    ogc.lineWidth=Math.max(2, side*0.12*mScale);
+    ogc.lineWidth=Math.max(2, side*0.13*mScale);
     curStrokes().forEach(s=>{ ogc.beginPath(); s.forEach((p,i)=>{const q=M(p); const x=q.x*mScale,y=q.y*mScale; i?ogc.lineTo(x,y):ogc.moveTo(x,y);}); ogc.stroke(); });
   }
   guidePix=0; const d=ogc.getImageData(0,0,mW,mH).data;
   for(let i=3;i<d.length;i+=4) if(d[i]>20) guidePix++;
 }
 function inkSeg(a,b){ oic.strokeStyle='#000'; oic.lineCap='round'; oic.lineJoin='round';
-  oic.lineWidth=Math.max(2, side*0.12*mScale); oic.beginPath();
+  oic.lineWidth=Math.max(2, side*0.14*mScale); oic.beginPath();
   oic.moveTo(a.x*mScale,a.y*mScale); oic.lineTo(b.x*mScale,b.y*mScale); oic.stroke(); }
 function coverage(){ if(!guidePix) return 0;
   const g=ogc.getImageData(0,0,mW,mH).data, k=oic.getImageData(0,0,mW,mH).data; let hit=0;
   for(let i=3;i<g.length;i+=4){ if(g[i]>20 && k[i]>20) hit++; } return hit/guidePix; }
+function passGrade(){ const t=SETS[mode].type;
+  if(t!=='stroke') return coverage()>=wordThr;
+  const need=curStrokes().length, c=coverage();
+  // 모든 획을 그렸고(펜 든 횟수≥획 수) 충분히 덮었거나, 거의 다 덮었으면 통과
+  return penStrokes>=need && c>=strokeThr; }
 
 // ===== 그리기 =====
-let drawing=false, last=null;
+let drawing=false, last=null, activeId=null;
 function pos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
-cv.addEventListener('pointerdown',e=>{ if(playing) return;
-  drawing=true; drew=true; last=pos(e); cv.setPointerCapture(e.pointerId);
+cv.addEventListener('pointerdown',e=>{ if(playing||drawing) return;
+  activeId=e.pointerId; drawing=true; drew=true; penStrokes++; last=pos(e); try{cv.setPointerCapture(e.pointerId);}catch(_){}
   ctx.beginPath(); ctx.moveTo(last.x,last.y); blip(520,0.05,0.04); });
-cv.addEventListener('pointermove',e=>{ if(!drawing) return; const p=pos(e);
-  const lw=Math.max(4, penWidth*(0.55+(e.pressure||0.5)));
+cv.addEventListener('pointermove',e=>{ if(!drawing||e.pointerId!==activeId) return; const p=pos(e);
+  const lw=Math.max(8, penWidth*(0.55+(e.pressure||0.5)));
   ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.lineJoin='round';
   const mx=(last.x+p.x)/2, my=(last.y+p.y)/2;
   ctx.quadraticCurveTo(last.x,last.y,mx,my); ctx.stroke();
@@ -511,9 +522,10 @@ cv.addEventListener('pointermove',e=>{ if(!drawing) return; const p=pos(e);
   ctx.beginPath(); ctx.moveTo(last.x+1.2,last.y-1.2); ctx.lineTo(p.x+1.2,p.y-1.2); ctx.stroke(); ctx.restore();
   inkSeg(last,p);
   ctx.beginPath(); ctx.moveTo(mx,my); last=p; });
-function endDraw(){ if(!drawing) return; drawing=false;
-  if(drew && !doneItem && coverage()>=gradeThr) celebrate(); }
-['pointerup','pointercancel','pointerleave'].forEach(ev=>cv.addEventListener(ev,endDraw));
+function endDraw(e){ if(!drawing) return; if(e&&e.pointerId!=null&&e.pointerId!==activeId) return;
+  drawing=false; activeId=null;
+  if(drew && !doneItem && passGrade()) celebrate(); }
+['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,endDraw));
 
 // ===== 획순 애니메이션 =====
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -564,7 +576,7 @@ $('cok').onclick=()=>{ let t=($('cinput').value||'').trim().slice(0,8) || SETS[m
 $('ccancel').onclick=()=>{ $('modal').classList.remove('show'); drawGuide(); };
 
 // ===== 나이 추천 / 추천보기 =====
-function applyTier(t){ tier=t; const T=TIERS[t]; penWidth=T.pen; $('thick').value=penWidth; gradeThr=T.grade;
+function applyTier(t){ tier=t; const T=TIERS[t]; penWidth=T.pen; $('thick').value=penWidth; strokeThr=T.grade; wordThr=Math.min(0.7,T.grade+0.18);
   recOnly=true; group=langOf(SETS[T.mode]); mode=T.mode; idx=0;
   $('rectoggle').classList.add('on'); $('rectoggle').textContent='추천만';
   renderGroups(); buildTabs(); renderStrip(); drawGuide(); save(); }
@@ -586,25 +598,14 @@ function applyTheme(){ const t=THEMES[themeIdx];
 
 // ===== 시작 =====
 load(); starsEl.textContent='⭐ '+stars;
-if(tier && TIERS[tier]){ penWidth=TIERS[tier].pen; $('thick').value=penWidth; gradeThr=TIERS[tier].grade;
+if(tier && TIERS[tier]){ penWidth=TIERS[tier].pen; $('thick').value=penWidth; strokeThr=TIERS[tier].grade; wordThr=Math.min(0.7,TIERS[tier].grade+0.18);
   if(recOnly){ group=langOf(SETS[TIERS[tier].mode]); mode=TIERS[tier].mode; } }
 $('rectoggle').classList.toggle('on',recOnly); $('rectoggle').textContent=recOnly?'추천만':'전체보기';
 window.addEventListener('resize',fitCanvas);
 renderGroups(); buildTabs(); renderStrip(); applyTheme(); fitCanvas();
 if(!tier) setTimeout(openAge,400);
 if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }catch(e){} }
-</script>  <div class="modal" id="agemodal">
-    <div class="mbox">
-      <h3>아이 나이를 골라주세요</h3>
-      <div style="font-size:14px;color:#8a93ad;margin:-6px 0 10px">추천 탭과 펜·난이도를 맞춰드려요 (언제든 ⚙️에서 변경)</div>
-      <div class="agecol">
-        <button class="btn agebtn" data-tier="play">🧸 놀이 · 만 3~4세<span>도형·그림 따라그리기</span></button>
-        <button class="btn agebtn" data-tier="start">🔤 글자 시작 · 만 5~6세<span>자음·모음·숫자·가나다</span></button>
-        <button class="btn agebtn" data-tier="write">✍️ 쓰기 · 만 7~8세<span>받침·영어·받아쓰기</span></button>
-        <button class="rectoggle" id="ageall" style="margin:4px auto 0">전체 다 보기</button>
-      </div>
-    </div>
-  </div>
+</script>
 
 </body>
 </html>
