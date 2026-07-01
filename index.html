@@ -56,6 +56,12 @@ unicode-range:U+1100-11FF,U+3130-318F,U+A960-A97F,U+AC00-D7A3,U+D7B0-D7FF;}</sty
   .tab.on{ background:var(--blue); color:#fff; box-shadow:0 4px 0 #2f6fd1; }
   .tab.word.on{ background:var(--mint); color:#fff; box-shadow:0 4px 0 #4fa65b; }
   .strip{ display:flex; gap:10px; overflow-x:auto; padding:2px 14px 8px; scrollbar-width:none; }
+  .decades{ display:none; gap:8px; overflow-x:auto; padding:2px 14px 4px; scrollbar-width:none; }
+  .decades::-webkit-scrollbar{ display:none; }
+  .dchip{ flex:0 0 auto; border:none; cursor:pointer; font-family:inherit; font-weight:800;
+    background:#e9eefb; color:#5566aa; border-radius:16px; padding:7px 14px; font-size:clamp(14px,2.4vw,17px); box-shadow:0 3px 0 #cdd6ee; }
+  .dchip.on{ background:var(--purple); color:#fff; box-shadow:0 3px 0 #7a4fd6; }
+  .dchip:active{ transform:translateY(2px); }
   .strip::-webkit-scrollbar{ display:none; }
   .pick{ flex:0 0 auto; min-width:clamp(48px,8vw,64px); height:clamp(48px,8vw,64px);
     padding:0 10px; border:none; cursor:pointer; font-family:inherit; font-size:clamp(24px,4vw,32px); line-height:1;
@@ -121,6 +127,7 @@ unicode-range:U+1100-11FF,U+3130-318F,U+A960-A97F,U+AC00-D7A3,U+D7B0-D7FF;}</sty
     <button class="rectoggle" id="rectoggle">전체보기</button>
   </div>
   <div class="tabs" id="tabs"></div>
+  <div class="decades" id="decades"></div>
   <div class="strip" id="strip"></div>
 
   <div class="stage">
@@ -308,15 +315,17 @@ const SHAPE_CH=["●","▲","■","★","♥","◆"];
 const SHAPE_KO=["동그라미","세모","네모","별","하트","마름모"];
 const SHAPE_EN=["circle","triangle","square","star","heart","diamond"];
 
-// 숫자 10단위 세트: 1~10, 11~20, ... 91~100
-const NUMSETS_KO={}, NUMSETS_EN={};
+// 숫자: 1~10, 11~20 ... 91~100 데이터 (탭은 '숫자' 하나, 구간칩으로 전환)
+const NUM_DECADES=[], NUM_ITEMS_KO=[], NUM_ITEMS_EN=[];
 for(let d=0; d<10; d++){
-  const from=d*10+1, to=d*10+10, vals=[];
-  STROKES['num'+d]=[];
-  for(let v=from; v<=to; v++){ STROKES['num'+d].push(numStrokes(String(v))); vals.push(String(v)); }
-  const lbl=from+'~'+to;
-  NUMSETS_KO['ko_num'+d]={ label:lbl, lang:'ko-KR', type:'stroke', skey:'num'+d, useFont:false, items:vals.map(v=>[v,koReadNum(v)]) };
-  NUMSETS_EN['en_num'+d]={ label:lbl, lang:'en-US', type:'stroke', skey:'num'+d, useFont:false, items:vals.map(v=>[v,enReadNum(v)]) };
+  const from=d*10+1, to=d*10+10;
+  NUM_DECADES.push(from+'~'+to);
+  STROKES['num'+d]=[]; NUM_ITEMS_KO[d]=[]; NUM_ITEMS_EN[d]=[];
+  for(let v=from; v<=to; v++){ const sv=String(v);
+    STROKES['num'+d].push(numStrokes(sv));
+    NUM_ITEMS_KO[d].push([sv,koReadNum(sv)]);
+    NUM_ITEMS_EN[d].push([sv,enReadNum(sv)]);
+  }
 }
 
 const SETS = {
@@ -325,11 +334,11 @@ const SETS = {
   vowel:{ label:"모음", lang:"ko-KR", type:'stroke', skey:'vowel', useFont:true,
     items:[["ㅏ","아"],["ㅑ","야"],["ㅓ","어"],["ㅕ","여"],["ㅗ","오"],["ㅛ","요"],["ㅜ","우"],["ㅠ","유"],["ㅡ","으"],["ㅣ","이"]] },
   syllable:{ label:"가나다", lang:"ko-KR", type:'stroke', skey:'syllable', useFont:false, items:SYL.map(s=>[s,s]) },
-  ...NUMSETS_KO,
+  ko_num:{ label:"숫자", lang:"ko-KR", type:'stroke', skey:'num0', useFont:false, isNum:true, items:NUM_ITEMS_KO[0] },
   ko_shape:{ label:"도형", lang:"ko-KR", type:'stroke', skey:'shape', useFont:false, items:SHAPE_CH.map((c,i)=>[c,SHAPE_KO[i]]) },
   upper:{ label:"ABC", lang:"en-US", type:'stroke', skey:'upper', useFont:true, items:"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(c=>[c,c]) },
   lower:{ label:"abc", lang:"en-US", type:'stroke', skey:'lower', useFont:true, items:"abcdefghijklmnopqrstuvwxyz".split("").map(c=>[c,c.toUpperCase()]) },
-  ...NUMSETS_EN,
+  en_num:{ label:"Numbers", lang:"en-US", type:'stroke', skey:'num0', useFont:false, isNum:true, items:NUM_ITEMS_EN[0] },
   en_shape:{ label:"Shapes", lang:"en-US", type:'stroke', skey:'shape', useFont:false, items:SHAPE_CH.map((c,i)=>[c,SHAPE_EN[i]]) },
 
   ko_animals: wordSet("동물","ko-KR",[["강아지","🐶"],["고양이","🐱"],["토끼","🐰"],["곰","🐻"],["사자","🦁"],["코끼리","🐘"],["호랑이","🐯"],["원숭이","🐵"],["돼지","🐷"],["병아리","🐤"]]),
@@ -368,16 +377,16 @@ const THEMES=[
 ];
 
 let mode="consonant", idx=0, color=COLORS[0], stars=0, drew=false, showOrder=true, playing=false;
-let side=0, ox=0, oy=0, group='ko', penWidth=16, muted=false, examMode=false, themeIdx=0, wmEmoji='', doneItem=false;
+let side=0, ox=0, oy=0, group='ko', penWidth=16, muted=false, examMode=false, themeIdx=0, wmEmoji='', doneItem=false, numDecade=0;
 let tier=null, recOnly=false, strokeThr=0.35, wordThr=0.48, penStrokes=0;
 const TIERS={
   play:{ pen:24, grade:0.30, mode:'ko_shape', rec:{ ko:['ko_shape','ko_color','ko_animals','ko_food','ko_family','ko_nature'], en:['en_shape','en_color','en_animals','en_food'] } },
-  start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num0','ko_num1','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num0','en_num1','en_animals','en_custom'] } },
-  write:{ pen:14, grade:0.42, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num0','ko_num1','ko_color','ko_custom'], en:['upper','lower','en_num0','en_num1','en_animals','en_food','en_custom'] } }
+  start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num','en_animals','en_custom'] } },
+  write:{ pen:14, grade:0.42, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num','ko_color','ko_custom'], en:['upper','lower','en_num','en_animals','en_food','en_custom'] } }
 };
 
 const $=id=>document.getElementById(id);
-const tabsEl=$('tabs'), groupsEl=$('groups'), stripEl=$('strip'), colorsEl=$('colors'),
+const tabsEl=$('tabs'), groupsEl=$('groups'), stripEl=$('strip'), decadesEl=$('decades'), colorsEl=$('colors'),
       nameEl=$('name'), starsEl=$('stars'), yayEl=$('yay'), cv=$('cv'), ctx=cv.getContext('2d');
 const EMOJI_FONT="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif";
 const langOf=set=>set.lang.startsWith('ko')?'ko':'en';
@@ -419,7 +428,7 @@ function visibleKeys(){
   let keys=Object.keys(SETS).filter(k=>langOf(SETS[k])===group);
   if(recOnly && tier && TIERS[tier].rec[group]){
     const rec=TIERS[tier].rec[group];
-    keys=keys.filter(k=>rec.includes(k)||k===mode);
+    keys=keys.filter(k=>rec.includes(k)||k===mode||SETS[k].isNum);
     keys.sort((a,b)=>{ const ia=rec.indexOf(a), ib=rec.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
   }
   return keys;
@@ -444,8 +453,25 @@ COLORS.forEach((c,i)=>{ const s=document.createElement('div');
   colorsEl.appendChild(s); });
 
 // 선택 줄
+function applyDecade(){ const set=SETS[mode]; if(!set.isNum) return;
+  set.skey='num'+numDecade;
+  set.items = (group==='ko'?NUM_ITEMS_KO:NUM_ITEMS_EN)[numDecade];
+}
+function renderDecades(){
+  const set=SETS[mode];
+  if(!set || !set.isNum){ decadesEl.style.display='none'; decadesEl.innerHTML=''; return; }
+  decadesEl.style.display='flex'; decadesEl.innerHTML='';
+  NUM_DECADES.forEach((lbl,d)=>{ const b=document.createElement('button');
+    b.className='dchip'+(d===numDecade?' on':''); b.textContent=lbl;
+    b.onclick=()=>{ if(playing)return; numDecade=d; idx=0; renderStrip(); drawGuide(); };
+    decadesEl.appendChild(b); });
+  const on=decadesEl.children[numDecade]; if(on) on.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+}
 function renderStrip(){
-  const set=SETS[mode]; stripEl.innerHTML='';
+  const set=SETS[mode];
+  if(set.isNum) applyDecade();
+  renderDecades();
+  stripEl.innerHTML='';
   set.items.forEach((it,i)=>{ const b=document.createElement('button');
     b.className='pick'+(i===idx?' on':'');
     b.textContent = set.type!=='stroke' ? it[2] : it[0];
