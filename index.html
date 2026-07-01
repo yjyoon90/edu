@@ -378,7 +378,7 @@ const THEMES=[
 
 let mode="consonant", idx=0, color=COLORS[0], stars=0, drew=false, showOrder=true, playing=false;
 let side=0, ox=0, oy=0, group='ko', penWidth=16, muted=false, examMode=false, themeIdx=0, wmEmoji='', doneItem=false, numDecade=0;
-let tier=null, recOnly=false, strokeThr=0.35, wordThr=0.48, penStrokes=0;
+let tier=null, recOnly=false, strokeThr=0.35, wordThr=0.42, penStrokes=0;
 const TIERS={
   play:{ pen:24, grade:0.30, mode:'ko_shape', rec:{ ko:['ko_shape','ko_color','ko_animals','ko_food','ko_family','ko_nature'], en:['en_shape','en_color','en_animals','en_food'] } },
   start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num','en_animals','en_custom'] } },
@@ -500,9 +500,19 @@ function drawGuide(){
   buildMask(); updateControls();
 }
 function drawStrokeGuide(r){
+  const set=SETS[mode];
   if(examMode) return;
-  ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#cdd9f0'; ctx.lineWidth=side*0.13;
-  curStrokes().forEach(s=>{ ctx.beginPath(); s.forEach((p,i)=>{const q=M(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);}); ctx.stroke(); });
+  if(set.useFont){
+    const ch=set.items[idx][0];
+    ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=`${side*0.72}px Jua, sans-serif`;
+    ctx.fillStyle='#cdd9f2'; ctx.fillText(ch, r.width/2, r.height/2+side*0.03);
+    ctx.lineWidth=3; ctx.strokeStyle='#a9bce8'; ctx.strokeText(ch, r.width/2, r.height/2+side*0.03);
+    ctx.restore();
+  } else {
+    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#cdd9f0'; ctx.lineWidth=side*0.13;
+    curStrokes().forEach(s=>{ ctx.beginPath(); s.forEach((p,i)=>{const q=M(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);}); ctx.stroke(); });
+  }
   if(showOrder){ curStrokes().forEach((s,i)=>{ arrow(M(s[s.length-2]),M(s[s.length-1])); num(M(s[0]), i+1); }); }
 }
 function drawWordGuide(r){
@@ -541,6 +551,11 @@ function buildMask(){
     ogc.textAlign='center'; ogc.textBaseline='middle'; ogc.font=`${fs}px Jua, sans-serif`;
     while(ogc.measureText(word).width>maxW && fs>4){ fs-=1; ogc.font=`${fs}px Jua, sans-serif`; }
     ogc.fillText(word, mW/2, mH*0.66);
+  } else if(set.useFont){
+    const ch=set.items[idx][0];
+    ogc.textAlign='center'; ogc.textBaseline='middle';
+    ogc.font=`${side*0.72*mScale}px Jua, sans-serif`;
+    ogc.fillText(ch, mW/2, mH/2 + side*0.03*mScale);
   } else {
     ogc.lineWidth=Math.max(2, side*0.13*mScale);
     curStrokes().forEach(s=>{ ogc.beginPath(); s.forEach((p,i)=>{const q=M(p); const x=q.x*mScale,y=q.y*mScale; i?ogc.lineTo(x,y):ogc.moveTo(x,y);}); ogc.stroke(); });
@@ -554,10 +569,25 @@ function inkSeg(a,b){ oic.strokeStyle='#000'; oic.lineCap='round'; oic.lineJoin=
 function coverage(){ if(!guidePix) return 0;
   const g=ogc.getImageData(0,0,mW,mH).data, k=oic.getImageData(0,0,mW,mH).data; let hit=0;
   for(let i=3;i<g.length;i+=4){ if(g[i]>20 && k[i]>20) hit++; } return hit/guidePix; }
+function gradeWord(){
+  if(!guidePix) return 0;
+  const g=ogc.getImageData(0,0,mW,mH).data, k=oic.getImageData(0,0,mW,mH).data;
+  let minX=mW, maxX=-1;
+  for(let y=0;y<mH;y++){ const row=y*mW; for(let x=0;x<mW;x++){ if(g[(row+x)*4+3]>20){ if(x<minX)minX=x; if(x>maxX)maxX=x; } } }
+  if(maxX<minX) return 0;
+  const word=[...SETS[mode].items[idx][0]], n=Math.max(1,word.length);
+  const span=(maxX-minX+1)/n; let minC=1;
+  for(let bi=0;bi<n;bi++){
+    const xa=Math.floor(minX+bi*span), xb=(bi===n-1)?maxX:Math.floor(minX+(bi+1)*span)-1;
+    let tot=0,hit=0;
+    for(let y=0;y<mH;y++){ const row=y*mW; for(let x=xa;x<=xb;x++){ const i=(row+x)*4+3; if(g[i]>20){ tot++; if(k[i]>20) hit++; } } }
+    if(tot>8){ const c=hit/tot; if(c<minC) minC=c; }
+  }
+  return minC;
+}
 function passGrade(){ const t=SETS[mode].type;
-  if(t!=='stroke') return coverage()>=wordThr;
+  if(t!=='stroke') return gradeWord()>=wordThr;   // 단어: 글자마다 다 덮어야 통과
   const need=curStrokes().length, c=coverage();
-  // 모든 획을 그렸고(펜 든 횟수≥획 수) 충분히 덮었거나, 거의 다 덮었으면 통과
   return penStrokes>=need && c>=strokeThr; }
 
 // ===== 그리기 =====
