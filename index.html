@@ -293,8 +293,10 @@ function numStrokes(numStr){
   });
   return out;
 }
-const MULTI=["10","11","12","13","14","15","16","17","18","19","20","30","40","50","60","70","80","90","100"];
-STROKES.num = STROKES.digit.concat(MULTI.map(numStrokes));
+const MULTI=Array.from({length:100},(_,i)=>String(i+1)); // "1" ~ "100"
+STROKES.num = MULTI.map(numStrokes);
+const koReadNum=s=>{ const n=+s; return (n>=1&&n<=9)?NUM_KO[n-1]:s; };
+const enReadNum=s=>{ const n=+s; return (n>=1&&n<=9)?NUM_EN[n-1]:s; };
 
 // ===== 세트 =====
 function wordSet(label,lang,pairs){ return {label,lang,type:'word',items:pairs.map(([w,e])=>[w,w,e])}; }
@@ -306,17 +308,28 @@ const SHAPE_CH=["●","▲","■","★","♥","◆"];
 const SHAPE_KO=["동그라미","세모","네모","별","하트","마름모"];
 const SHAPE_EN=["circle","triangle","square","star","heart","diamond"];
 
+// 숫자 10단위 세트: 1~10, 11~20, ... 91~100
+const NUMSETS_KO={}, NUMSETS_EN={};
+for(let d=0; d<10; d++){
+  const from=d*10+1, to=d*10+10, vals=[];
+  STROKES['num'+d]=[];
+  for(let v=from; v<=to; v++){ STROKES['num'+d].push(numStrokes(String(v))); vals.push(String(v)); }
+  const lbl=from+'~'+to;
+  NUMSETS_KO['ko_num'+d]={ label:lbl, lang:'ko-KR', type:'stroke', skey:'num'+d, useFont:false, items:vals.map(v=>[v,koReadNum(v)]) };
+  NUMSETS_EN['en_num'+d]={ label:lbl, lang:'en-US', type:'stroke', skey:'num'+d, useFont:false, items:vals.map(v=>[v,enReadNum(v)]) };
+}
+
 const SETS = {
   consonant:{ label:"자음", lang:"ko-KR", type:'stroke', skey:'consonant', useFont:true,
     items:[["ㄱ","기역"],["ㄴ","니은"],["ㄷ","디귿"],["ㄹ","리을"],["ㅁ","미음"],["ㅂ","비읍"],["ㅅ","시옷"],["ㅇ","이응"],["ㅈ","지읒"],["ㅊ","치읓"],["ㅋ","키읔"],["ㅌ","티읕"],["ㅍ","피읖"],["ㅎ","히읗"]] },
   vowel:{ label:"모음", lang:"ko-KR", type:'stroke', skey:'vowel', useFont:true,
     items:[["ㅏ","아"],["ㅑ","야"],["ㅓ","어"],["ㅕ","여"],["ㅗ","오"],["ㅛ","요"],["ㅜ","우"],["ㅠ","유"],["ㅡ","으"],["ㅣ","이"]] },
   syllable:{ label:"가나다", lang:"ko-KR", type:'stroke', skey:'syllable', useFont:false, items:SYL.map(s=>[s,s]) },
-  ko_num:{ label:"숫자", lang:"ko-KR", type:'stroke', skey:'num', useFont:false, items:DIGITS.map((d,i)=>[d[0],NUM_KO[i]]).concat(MULTI.map(m=>[m,m])) },
+  ...NUMSETS_KO,
   ko_shape:{ label:"도형", lang:"ko-KR", type:'stroke', skey:'shape', useFont:false, items:SHAPE_CH.map((c,i)=>[c,SHAPE_KO[i]]) },
   upper:{ label:"ABC", lang:"en-US", type:'stroke', skey:'upper', useFont:true, items:"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(c=>[c,c]) },
   lower:{ label:"abc", lang:"en-US", type:'stroke', skey:'lower', useFont:true, items:"abcdefghijklmnopqrstuvwxyz".split("").map(c=>[c,c.toUpperCase()]) },
-  en_num:{ label:"Numbers", lang:"en-US", type:'stroke', skey:'num', useFont:false, items:DIGITS.map((d,i)=>[d[0],NUM_EN[i]]).concat(MULTI.map(m=>[m,m])) },
+  ...NUMSETS_EN,
   en_shape:{ label:"Shapes", lang:"en-US", type:'stroke', skey:'shape', useFont:false, items:SHAPE_CH.map((c,i)=>[c,SHAPE_EN[i]]) },
 
   ko_animals: wordSet("동물","ko-KR",[["강아지","🐶"],["고양이","🐱"],["토끼","🐰"],["곰","🐻"],["사자","🦁"],["코끼리","🐘"],["호랑이","🐯"],["원숭이","🐵"],["돼지","🐷"],["병아리","🐤"]]),
@@ -359,8 +372,8 @@ let side=0, ox=0, oy=0, group='ko', penWidth=16, muted=false, examMode=false, th
 let tier=null, recOnly=false, strokeThr=0.35, wordThr=0.48, penStrokes=0;
 const TIERS={
   play:{ pen:24, grade:0.30, mode:'ko_shape', rec:{ ko:['ko_shape','ko_color','ko_animals','ko_food','ko_family','ko_nature'], en:['en_shape','en_color','en_animals','en_food'] } },
-  start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num','en_animals','en_custom'] } },
-  write:{ pen:14, grade:0.42, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num','ko_color','ko_custom'], en:['upper','lower','en_num','en_animals','en_food','en_custom'] } }
+  start:{ pen:18, grade:0.35, mode:'consonant', rec:{ ko:['consonant','vowel','ko_num0','ko_num1','syllable','ko_animals','ko_food','ko_custom'], en:['upper','lower','en_num0','en_num1','en_animals','en_custom'] } },
+  write:{ pen:14, grade:0.42, mode:'syllable', rec:{ ko:['syllable','ko_batchim','consonant','vowel','ko_num0','ko_num1','ko_color','ko_custom'], en:['upper','lower','en_num0','en_num1','en_animals','en_food','en_custom'] } }
 };
 
 const $=id=>document.getElementById(id);
