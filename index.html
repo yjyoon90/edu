@@ -823,7 +823,10 @@ function endDraw(e){ if(!drawing) return; if(e&&e.pointerId!=null&&e.pointerId!=
       curStrokeIdx++; blip(700+curStrokeIdx*60, 0.08, 0.05);
       if(curStrokeIdx>=curStrokes().length){
         blip(980,0.12,0.06);
-        if('speechSynthesis' in window && !muted){ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance('좋아요! 이제 혼자 써 볼까요?'); u.lang='ko-KR'; u.rate=0.95; speechSynthesis.speak(u);}catch(_){} }
+        if('speechSynthesis' in window && !muted){ try{ speechSynthesis.cancel();
+          const it=SETS[mode].items[idx];
+          const u1=new SpeechSynthesisUtterance(it[1]); u1.lang=SETS[mode].lang; u1.rate=0.8; speechSynthesis.speak(u1);
+          const u2=new SpeechSynthesisUtterance('좋아요! 이제 혼자 써 볼까요?'); u2.lang='ko-KR'; u2.rate=0.95; speechSynthesis.speak(u2);}catch(_){} }
         const done=curStrokeIdx; drawGuide(); curStrokeIdx=done; drawDoneStrokes();
         curStep=2; setTimeout(()=>drawGuide(), 700);
       } else { drawGuide(); }
@@ -852,6 +855,7 @@ function animateOne(pts){ return new Promise(res=>{
   requestAnimationFrame(frame); }); }
 async function playOrder(auto){ if(playing || SETS[mode].type!=='stroke') return; playing=true; drawGuide();
   for(const s of curStrokes()){ await animateOne(s); await sleep(220); }
+  speak();
   await sleep(400);
   if(auto===true && stepMode && curStep===0) curStep=1;
   playing=false; drawGuide(); }
@@ -875,7 +879,10 @@ $('sound').onclick=speak;
 
 function celebrate(){ if(doneItem) return; doneItem=true; stars++; starsEl.textContent='⭐ '+stars; save(); fanfare();
   yayEl.classList.add('show');
-  if('speechSynthesis' in window){ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance('참 잘했어요'); u.lang='ko-KR'; u.rate=0.9; speechSynthesis.speak(u); }
+  if('speechSynthesis' in window){ speechSynthesis.cancel();
+    const it=SETS[mode].items[idx];
+    const u1=new SpeechSynthesisUtterance(it[1]); u1.lang=SETS[mode].lang; u1.rate=0.8; speechSynthesis.speak(u1);
+    const u2=new SpeechSynthesisUtterance('참 잘했어요'); u2.lang='ko-KR'; u2.rate=0.9; speechSynthesis.speak(u2); }
   const m0=mode, i0=idx;
   setTimeout(()=>{ if(mode!==m0 || idx!==i0 || !doneItem) return;
     idx=(idx+1)%SETS[mode].items.length; renderStrip(); drawGuide(); },1400); }
