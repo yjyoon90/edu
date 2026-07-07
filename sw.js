@@ -1,5 +1,5 @@
 // 글자 따라쓰기 - 서비스워커 (HTML은 네트워크 우선 → 올리면 바로 반영)
-const CACHE = 'trace-v19';
+const CACHE = 'trace-v21';
 const ASSETS = [
   './',
   './index.html',
